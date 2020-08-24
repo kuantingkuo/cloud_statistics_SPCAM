@@ -8,14 +8,18 @@ program cldsize
     Character ( len=* ) , parameter :: FILE_NAME  = "Q_120-20_0001-01.nc"
     Character ( len=* ) , parameter :: SIZE_FILE  = "Q_120-20_0001-01.txt"
     Logical             , parameter :: WRITE_BACK = .TRUE.
-    Integer             , parameter :: CONNECT    = 8
-    Integer             , parameter :: C_DIM      = 2 
-    Integer                         :: Time , x , label , i , j , temp, k , t , num
+    Integer             , parameter :: CONNECT    = 4
+    Integer             , parameter :: C_DIM      = 2
+    Integer                         :: Time, x, label, i, j, temp, k, t, num
     Integer                         :: label_data(NX,NZ) , cloudflag(NX,NZ)
-    Real(kind=4)                    :: cld_inc_size( GRIDSIZE ) 
-    Real(kind=4)                    :: qc3d_data(NX,NZ) , qcalldata(NX,NZ,NT) , & 
-                                       size_data(NX,NZ,NT) , height(NZ), depth(NZ)
-    integer :: ncid, timeid, zid, xid, qid, tsize, labid, sizid, hid
+    Real(kind=4)                    :: cld_inc_size( GRIDSIZE )
+    real(kind=4), dimension(NX,NZ,NT) :: qcalldata, qralldata
+    Real(kind=4), dimension(NX,NZ)    :: qc3d_data, qr3d_data, size_data
+    real(kind=4), dimension(NZ)       :: height, depth
+    integer(kind=1), dimension(NX,NZ) :: cltype
+    integer :: ncid, timeid, zid, xid, qid, rid, tsize, labid, sizid, hid, typid
+    integer :: latid, lonid, status
+    real(kind=4) :: lon, lat, hsfc
 
     open( unit=4567 , file=SIZE_FILE, status="unknown" )
 
@@ -24,6 +28,7 @@ program cldsize
 !          recl = NX  )
 
     print*, "read data..."
+
     if (WRITE_BACK) then
       call check_nf90( nf90_open(file_name, NF90_WRITE, ncid) )
     else
@@ -35,38 +40,65 @@ program cldsize
     call check_nf90( nf90_inquire_dimension(ncid, timeid, len=tsize) )
     call check_nf90( nf90_inq_varid(ncid, "qci", qid) )
     call check_nf90( nf90_get_var(ncid, qid, qcalldata(:,:,1:tsize)) )
+    call check_nf90( nf90_inq_varid(ncid, "qpr", rid) )
+    call check_nf90( nf90_get_var(ncid, rid, qralldata(:,:,1:tsize)) )
     call check_nf90( nf90_inq_varid(ncid, "crm_nz", hid) )
     call check_nf90( nf90_get_var(ncid, hid, height) )
+    call check_nf90( nf90_inq_varid(ncid, "lat", latid) )
+    call check_nf90( nf90_get_var(ncid, latid, lat) )
+    call check_nf90( nf90_inq_varid(ncid, "lon", lonid) )
+    call check_nf90( nf90_get_var(ncid, lonid, lon) )
+
+    call surface_height( lon, lat, hsfc )
 
     do k=2,NZ-1
        depth(k) = (height(k+1) - height(k-1))/2.
     enddo
-    depth(1) = height(1) + (height(2)-height(1))/2.
+    depth(1) = height(1)-hsfc + (height(2)-height(1))/2.
     depth(NZ) = height(NZ) - height(NZ-1)
 
     if (WRITE_BACK) then
       print*, "preparing output variables..."
-      call check_nf90( nf90_def_var(ncid, 'label', NF90_UBYTE, (/xid, zid, timeid/), labid) )
-      call check_nf90( nf90_def_var(ncid, 'size', NF90_FLOAT, (/xid, zid, timeid/), sizid) )
-      call check_nf90( nf90_put_att(ncid, labid, 'long_name', 'number of cloud') )
-      call check_nf90( nf90_put_att(ncid, labid, 'units', '#') )
-      call check_nf90( nf90_put_att(ncid, sizid, 'long_name', 'cloud size') )
-      call check_nf90( nf90_put_att(ncid, sizid, 'units', 'km^2') )
-      call check_nf90( nf90_enddef(ncid) )
+
+      status = nf90_def_var(ncid, 'label', NF90_UBYTE, (/xid, zid, timeid/), labid)
+      if (status /= NF90_ENAMEINUSE) then
+        call check_nf90( nf90_def_var(ncid, 'size', NF90_FLOAT, &
+                                      (/xid, zid, timeid/), sizid) )
+        call check_nf90( nf90_def_var(ncid, 'type', NF90_UBYTE, &
+                                      (/xid, zid, timeid/), typid) )
+        call check_nf90( nf90_put_att(ncid, labid, 'long_name', &
+                                                   'number of cloud') )
+        call check_nf90( nf90_put_att(ncid, labid, 'units', '#') )
+        call check_nf90( nf90_put_att(ncid, sizid, 'long_name', 'cloud size') )
+        call check_nf90( nf90_put_att(ncid, sizid, 'units', 'km^2') )
+        call check_nf90( nf90_put_att(ncid, typid, 'long_name', &
+             'cloud types (1:High cloud 2:Altostratus 3:Altocumulus 4:Stratus 5:Stratocumulus 6:Cumulus 7:Nimbostratus 8:Deep convective clouds 10:undefined)') )
+        call check_nf90( nf90_enddef(ncid) )
+      else
+        call check_nf90( nf90_inq_varid(ncid, 'label', labid) )
+        call check_nf90( nf90_inq_varid(ncid, 'size', sizid) )
+        call check_nf90( nf90_inq_varid(ncid, 'type', typid) )
+      endif
     endif
 
     print*, "start identifying cloud objects..."
     do Time = 1 , tsize
        qc3d_data = qcalldata(:,:,time)
-       call find_cloud( qc3d_data , dx, depth, label_data , cld_inc_size , label )
+       call find_cloud( qc3d_data, dx, depth, label_data, cld_inc_size, label )
        cld_inc_size = cld_inc_size * 1.e-6 ! m^2 -> km^2
-        if ( WRITE_BACK ) then
-            call refill_data( label_data , cld_inc_size , size_data)
+
+       qr3d_data = qralldata(:,:,time)
+       call cloud_type( label_data, qr3d_data, height, depth, hsfc, cld_inc_size, cltype )
+
+       if ( WRITE_BACK ) then
+           call refill_data( label_data , cld_inc_size , size_data)
 !            call check ( nf_put_vara_int( ncid(1) , varcldsize , nc_start , nc_count ,label_data ) ) 
-           call check_nf90( nf90_put_var(ncid, labid, label_data, (/1, 1, time/), &
-                                                                  (/NX, NZ, 1/)) )
-           call check_nf90( nf90_put_var(ncid, sizid, size_data, (/1, 1, time/), &
-                                                                 (/NX, NZ, 1/)) )
+           call check_nf90( nf90_put_var(ncid, labid, label_data, &
+                                         (/1, 1, time/), (/NX, NZ, 1/)) )
+           call check_nf90( nf90_put_var(ncid, sizid, size_data, &
+                                         (/1, 1, time/), (/NX, NZ, 1/)) )
+           call check_nf90( nf90_put_var(ncid, typid, cltype, &
+                                         (/1, 1, time/), (/NX, NZ, 1/)) )
 
 !           do k=1,NZ
 !            do j=1,NY  
@@ -109,7 +141,7 @@ contains
         enddo
     end subroutine
 
-    subroutine find_cloud( qc_data , dx, depth , label_data , cld_inc_size , label )
+    subroutine find_cloud( qc_data, dx, depth, label_data, cld_inc_size, label )
         real       , intent (in)    :: qc_data(NX,NZ) 
         real(kind=4), intent(in)    :: dx, depth(NZ)
         integer    , intent (out)   :: label_data(NX,NZ)
@@ -192,12 +224,150 @@ contains
 
     end subroutine
 
+subroutine cloud_type( label_data, qr3d_data, height, depth, hsfc, cld_inc_size, cltype )
+integer, dimension(NX,NZ), intent(in) :: label_data
+real(kind=4), dimension(NX,NZ), intent(in) :: qr3d_data
+real(kind=4), dimension(NZ), intent(in) :: height, depth
+real(kind=4), intent(in) :: hsfc, cld_inc_size(GRIDSIZE)
+integer(kind=1), dimension(NX,NZ), intent(out) :: cltype
+character(2), dimension(8), parameter :: typename =  &
+                                    (/"Hc","As","Ac","St","Sc","Cu","Ns","Dc"/)
+integer :: i, k, n, maxn, typenum, k1, k2
+real :: base, top, clsize, rain, thick
+cltype = 0
+do i=1,NX
+   maxn = maxval(label_data(i,:))
+   do n=1,maxn
+      typenum = 10
+      do k=1,NZ
+         if (label_data(i,k)==n) then
+            base = height(k) - hsfc
+            rain = qr3d_data(i,k)
+            k1 = k
+            exit
+         endif
+      enddo
+      do k=NZ,k1,-1
+         if (label_data(i,k)==n) then
+            top = height(k)
+            k2 = k
+            exit
+         endif
+      enddo
+      clsize = cld_inc_size(n)
+      thick = 0.
+      do k=k1,k2
+         thick = thick + depth(k)
+      enddo
+
+      if (base > 7000.) then
+         typenum = 1
+      elseif (base > 4000.) then
+         if (rain > 1.e-6) then
+            typenum = 3
+         else
+            typenum = 2
+         endif
+      elseif ((thick > 5000.) .and. (rain > 1.e-5)) then
+         if (clsize*1000./thick > 100.) then
+            typenum = 7
+         else
+            typenum = 8
+         endif
+      elseif (base <= 2000.) then
+         if (clsize*1000./thick > 30.) then
+            if (rain >= 1.e-5) then
+               typenum = 5
+            else
+               typenum = 4
+            endif
+         else
+            typenum = 6
+         endif
+      else
+         if ((base > 3000.) .or. (clsize*1000./thick > 100.)) then
+            if (rain > 1.e-6) then
+               typenum = 3
+            else
+               typenum = 2
+            endif
+         else
+            typenum = 6
+         endif
+      endif
+
+!      if (rain >= 1.e-6) then
+!         if (thick > 4000.) then
+!            if (clsize*1000./thick > 100. ) then
+!               typenum = 7
+!            else
+!               typenum = 8
+!            endif
+!         else
+!           if (base > 2000.) then
+!              typenum = 3
+!           else
+!              typenum = 5
+!           endif
+!         endif
+!      else
+!         if (base > 7000.) then
+!            typenum = 1
+!         elseif (base > 3000.) then
+!            typenum = 2
+!         else
+!           if (clsize*1000./thick >= 100. ) then
+!              typenum = 4
+!           else
+!              typenum = 6
+!           endif 
+!         endif
+!      endif
+      do k=1,NZ
+         if (label_data(i,k) == n) cltype(i,k) = typenum
+      enddo
+   enddo
+enddo
+end subroutine
+
 subroutine check_nf90(err)
 integer, intent(in) :: err
 if (err /= nf90_noerr) then
-  print*, "ERROR!: ", trim(nf90_strerror(err))
+  print*, "ERROR: ", trim(nf90_strerror(err)), err
   stop
 endif
+end subroutine
+
+subroutine surface_height( lon, lat, hsfc )
+real(kind=4), intent(in) :: lon, lat
+real(kind=4), intent(out) :: hsfc
+real(kind=4), parameter :: g = 9.80616
+character(*), parameter :: topofile = "/data/W.eddie/SPCAM/USGS-gtopo30_1.9x2.5_remap_c050602.nc"
+integer :: toponcid, phisid, lonid, latid, xidx, yidx, i
+real(kind=8) :: phis, lonall(144), latall(96)
+call check_nf90( nf90_open(topofile, NF90_NOWRITE, toponcid) )
+call check_nf90( nf90_inq_varid(toponcid, "lon", lonid) )
+call check_nf90( nf90_get_var(toponcid, lonid, lonall) )
+call check_nf90( nf90_inq_varid(toponcid, "lat", latid) )
+call check_nf90( nf90_get_var(toponcid, latid, latall) )
+xidx = 0
+do i=1,144
+  if(abs(real(lon,kind=8)-lonall(i)) < 1.e-4 ) then
+    xidx = i
+    exit
+  endif
+enddo
+yidx = 0
+do i=1,96
+  if(abs(real(lat,kind=8)-latall(i)) < 1.e-4 ) then
+    yidx = i
+    exit
+  endif
+enddo
+call check_nf90( nf90_inq_varid(toponcid, "PHIS", phisid) )
+call check_nf90( nf90_get_var(toponcid, phisid, phis, (/xidx, yidx/)) )
+call check_nf90( nf90_close(toponcid) )
+hsfc = real(phis,kind=4)/g
 end subroutine
 
 end program
