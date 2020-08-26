@@ -3,9 +3,9 @@ use netcdf
 implicit none
 character(20), parameter :: casename="CPL64"
 character(99), parameter :: path="/data/W.eddie/SPCAM/"//trim(casename)//"/"
-real(kind=4), parameter :: target_lon=90., target_lat=-5.
+real(kind=4), parameter :: target_lon=90., target_lat=-10. ! target grid
 integer, dimension(12), parameter :: dayend=(/31,28,31,30,31,30,31,31,30,31,30,31/)
-integer :: i, xidx, yidx, year, month, day, crmt1
+integer :: i, xidx, yidx, year, month, day, crmt1, tsize
 integer :: ncid, lonid, latid, z3id, timevid, qtotid, qciid, crmxid, crmzid
 integer :: timeid, lat1id, lon1id, crmzvid, crmxvid, qprid
 real(kind=4) :: lon(144), lat(96), time(1488), hgt(24)
@@ -36,7 +36,7 @@ do i=1,96
      exit
    endif
 enddo
-
+! read height coordinate for this grid
 call check_nf90( nf90_inq_varid(ncid, "Z3", z3id) )
 call check_nf90( nf90_get_var(ncid, z3id, hgt, (/xidx, yidx, 3/), (/1, 1, 24/)) )
 hgt = hgt(24:1:-1)
@@ -93,14 +93,15 @@ do year=1,10
          call check_nf90( nf90_close(ncid) )
       enddo
       print*,"processing dataset..."
-      qpr(:,:,1:day*48) = qtot(:,:,1:day*48) - qci(:,:,1:day*48)
+      tsize = dayend(month)*48
+      qpr(:,:,1:tsize) = qtot(:,:,1:tsize) - qci(:,:,1:tsize)
       outfile = &
         "/data/W.eddie/cloudsize/"//trim(casename)//"/Q_"//trim(outlon)//"-"//trim(outlat)//"_"//yyyy//"-"//mm//".nc"
       call system("rm -f "//outfile)
       call check_nf90( nf90_create(outfile, NF90_NETCDF4, ncid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nx", 64, crmxid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nz", 24, crmzid) )
-      call check_nf90( nf90_def_dim(ncid, "time", dayend(month)*48, timeid) )
+      call check_nf90( nf90_def_dim(ncid, "time", tsize, timeid) )
       call check_nf90( nf90_def_var(ncid, "lat", NF90_DOUBLE, lat1id) )
       call check_nf90( nf90_def_var(ncid, "lon", NF90_DOUBLE, lon1id) )
       call check_nf90( nf90_def_var(ncid, "time", NF90_DOUBLE, timeid, timevid) )
@@ -132,11 +133,11 @@ do year=1,10
       print*,"output netcdf file..."
       call check_nf90( nf90_put_var(ncid, lat1id, lat(yidx)) )
       call check_nf90( nf90_put_var(ncid, lon1id, lon(xidx)) )
-      call check_nf90( nf90_put_var(ncid, timevid, time(1:dayend(month)*48)) )
+      call check_nf90( nf90_put_var(ncid, timevid, time(1:tsize)) )
       call check_nf90( nf90_put_var(ncid, crmzvid, hgt) )
       call check_nf90( nf90_put_var(ncid, crmxvid, (/ (i*4+2, i=0,63) /)) )
-      call check_nf90( nf90_put_var(ncid, qciid, qci(:,:,1:dayend(month)*48)) )
-      call check_nf90( nf90_put_var(ncid, qprid, qpr(:,:,1:dayend(month)*48)) )
+      call check_nf90( nf90_put_var(ncid, qciid, qci(:,:,1:tsize)) )
+      call check_nf90( nf90_put_var(ncid, qprid, qpr(:,:,1:tsize)) )
       call check_nf90( nf90_close(ncid) )
    enddo
 enddo
