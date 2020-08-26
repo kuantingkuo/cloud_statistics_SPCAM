@@ -8,8 +8,9 @@ starttime=time.time()
 # Basic settings 
 case="CPL64"
 path="/data/W.eddie/SPCAM/"+case+"/"
-target_lon=100.  # target longitude
+target_lon=90.  # target longitude
 target_lat=0.   # target latitude
+outpath="/data/W.eddie/cloudtype/"+casename+"/"
 
 # Read heiget coordinate in this grid
 gcmf=xr.open_dataset(path+case+".cam.h0.0001-01-01-00000.nc")
@@ -34,7 +35,7 @@ for y in range(1, 11):
 
         lon=str(int(np.round(qtot.LON_60e_to_180e.values)))
         lat=str(int(np.round(qtot.LAT_15s_to_30n.values)))
-        outfile="/data/W.eddie/cloudsize/"+case+"/Q_"+lon+"-"+lat+"_"+year+"-"+month+".nc"
+        outfile=outpath+"Q_"+lon+"-"+lat+"_"+year+"-"+month+".nc"
 
         if os.path.isfile(outfile):
            if os.stat(outfile).st_size in {18307429, 16536805, 17717221}:
@@ -63,3 +64,4 @@ for y in range(1, 11):
                                'qpr': {'_FillValue': None}
                               })
         ds.close
+        os.system("/data/W.eddie/cloudtype/cal_cloud_spcam.exe "+outfile+" &")

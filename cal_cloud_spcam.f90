@@ -5,11 +5,12 @@ program cldsize
     Integer             , parameter :: NX=64 , NY=1, NZ=24 , NT=1488
     real(kind=4), parameter         :: dx=4000. ![m]
     Integer             , parameter :: GRIDSIZE   = NX*NZ
-    Character ( len=* ) , parameter :: FILE_NAME  = "Q_120-20_0001-01.nc"
-    Character ( len=* ) , parameter :: SIZE_FILE  = "Q_120-20_0001-01.txt"
-    Logical             , parameter :: WRITE_BACK = .TRUE.
-    Integer             , parameter :: CONNECT    = 4
+!    Character ( len=* ) , parameter :: FILE_NAME  = "Q_120-20_0001-01.nc"
+!    Character ( len=* ) , parameter :: SIZE_FILE  = "Q_120-20_0001-01.txt"
+    Logical             , parameter :: WRITE_BACK = .True.
+    Integer             , parameter :: CONNECT    = 4 ![4|8] ways connetion
     Integer             , parameter :: C_DIM      = 2
+    Character ( len=99 )            :: FILE_NAME, SIZE_FILE
     Integer                         :: Time, x, label, i, j, temp, k, t, num
     Integer                         :: label_data(NX,NZ) , cloudflag(NX,NZ)
     Real(kind=4)                    :: cld_inc_size( GRIDSIZE )
@@ -18,10 +19,13 @@ program cldsize
     real(kind=4), dimension(NZ)       :: height, depth
     integer(kind=1), dimension(NX,NZ) :: cltype
     integer :: ncid, timeid, zid, xid, qid, rid, tsize, labid, sizid, hid, typid
-    integer :: latid, lonid, status
+    integer :: latid, lonid, status, length
     real(kind=4) :: lon, lat, hsfc
     character(2), dimension(GRIDSIZE) :: cld_one_type
 
+    call get_command_argument(1, FILE_NAME, length)
+    SIZE_FILE = FILE_NAME(1:length-2)//"txt"
+    print*, "output file to ", trim(SIZE_FILE)
     open( unit=4567 , file=SIZE_FILE, status="unknown" )
 
 !    open( unit=6789 , file=FILE_NAME , status="old"  , &
@@ -225,6 +229,10 @@ contains
     end subroutine
 
 subroutine cloud_type( label_data, qr3d_data, height, depth, hsfc, cld_inc_size, cltype, cld_one_type )
+!! Conditions of cloud types are adapted from Table 2 shown by Wang and Sassen (2001).
+!! Ref.: Wang, Z., and K.Sassen, 2001: Cloud Type and Macrophysical Property Retrieval
+!!       Using Multiple Remote Sensors. J. Appl. Meteorol., 40, 1665–1682,
+!!       doi:10.1175/1520-0450(2001)040<1665:CTAMPR>2.0.CO;2.
 integer, dimension(NX,NZ), intent(in) :: label_data
 real(kind=4), dimension(NX,NZ), intent(in) :: qr3d_data
 real(kind=4), dimension(NZ), intent(in) :: height, depth
