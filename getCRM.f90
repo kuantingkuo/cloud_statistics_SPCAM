@@ -3,8 +3,8 @@ use netcdf
 implicit none
 character(20), parameter :: casename="CPL64"
 character(99), parameter :: path="/data/W.eddie/SPCAM/"//trim(casename)//"/"
-real(kind=4), parameter :: target_lon=90., target_lat=-10. ! target grid
-character(99), parameter :: outpath="/data/W.eddie/cloudtype/"//trim(casename)//"/"
+real(kind=4), parameter :: target_lon=120., target_lat=-10. ! target grid
+character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dayend=(/31,28,31,30,31,30,31,31,30,31,30,31/)
 integer :: i, xidx, yidx, year, month, day, crmt1, tsize
 integer :: ncid, lonid, latid, z3id, timevid, qtotid, qciid, crmxid, crmzid
@@ -47,6 +47,8 @@ write(outlon,'(I3)') nint(lon(xidx))
 write(outlat,'(I3)') nint(lat(yidx))
 outlon=adjustl(outlon)
 outlat=adjustl(outlat)
+call execute_command_line("mkdir -p "//outpath)
+
 first = .True.
 do year=1,10
    write(yyyy,'(I0.4)') year
@@ -97,7 +99,7 @@ do year=1,10
       tsize = dayend(month)*48
       qpr(:,:,1:tsize) = qtot(:,:,1:tsize) - qci(:,:,1:tsize)
       outfile = outpath//"Q_"//trim(outlon)//"-"//trim(outlat)//"_"//yyyy//"-"//mm//".nc"
-      call system("rm -f "//outfile)
+      call execute_command_line("rm -f "//outfile)
       call check_nf90( nf90_create(outfile, NF90_NETCDF4, ncid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nx", 64, crmxid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nz", 24, crmzid) )
@@ -139,7 +141,7 @@ do year=1,10
       call check_nf90( nf90_put_var(ncid, qciid, qci(:,:,1:tsize)) )
       call check_nf90( nf90_put_var(ncid, qprid, qpr(:,:,1:tsize)) )
       call check_nf90( nf90_close(ncid) )
-      call execute_command_line("/data/W.eddie/cloudtype/cal_cloud_spcam.exe "//outfile//" &")
+      call execute_command_line("./cal_cloud_spcam.exe "//outfile//" &")
    enddo
 enddo
 

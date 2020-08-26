@@ -10,7 +10,8 @@ case="CPL64"
 path="/data/W.eddie/SPCAM/"+case+"/"
 target_lon=90.  # target longitude
 target_lat=0.   # target latitude
-outpath="/data/W.eddie/cloudtype/"+casename+"/"
+outpath="./"+casename+"/"
+os.system("mkdir -p "+outpath)
 
 # Read heiget coordinate in this grid
 gcmf=xr.open_dataset(path+case+".cam.h0.0001-01-01-00000.nc")
