@@ -20,6 +20,7 @@ program cldsize
     integer :: ncid, timeid, zid, xid, qid, rid, tsize, labid, sizid, hid, typid
     integer :: latid, lonid, status
     real(kind=4) :: lon, lat, hsfc
+    character(2), dimension(GRIDSIZE) :: cld_one_type
 
     open( unit=4567 , file=SIZE_FILE, status="unknown" )
 
@@ -86,9 +87,8 @@ program cldsize
        qc3d_data = qcalldata(:,:,time)
        call find_cloud( qc3d_data, dx, depth, label_data, cld_inc_size, label )
        cld_inc_size = cld_inc_size * 1.e-6 ! m^2 -> km^2
-
        qr3d_data = qralldata(:,:,time)
-       call cloud_type( label_data, qr3d_data, height, depth, hsfc, cld_inc_size, cltype )
+       call cloud_type( label_data, qr3d_data, height, depth, hsfc, cld_inc_size, cltype, cld_one_type )
 
        if ( WRITE_BACK ) then
            call refill_data( label_data , cld_inc_size , size_data)
@@ -116,7 +116,7 @@ program cldsize
             if ( cld_inc_size(x) .GE. temp ) then
                 temp = cld_inc_size(x)
             endif
-            write ( 4567,'(I5,I9,F9.3)' ) Time , x , cld_inc_size(x) 
+            write ( 4567,'(I5,I9,F9.3,1X,A2)' ) Time, x, cld_inc_size(x), cld_one_type(x)
         enddo
 
         !write ( 4567,'(A2,I5,A6,I9)' ) 'T=' , Time , ',size=' , temp 
@@ -224,21 +224,26 @@ contains
 
     end subroutine
 
-subroutine cloud_type( label_data, qr3d_data, height, depth, hsfc, cld_inc_size, cltype )
+subroutine cloud_type( label_data, qr3d_data, height, depth, hsfc, cld_inc_size, cltype, cld_one_type )
 integer, dimension(NX,NZ), intent(in) :: label_data
 real(kind=4), dimension(NX,NZ), intent(in) :: qr3d_data
 real(kind=4), dimension(NZ), intent(in) :: height, depth
 real(kind=4), intent(in) :: hsfc, cld_inc_size(GRIDSIZE)
 integer(kind=1), dimension(NX,NZ), intent(out) :: cltype
+character(2), dimension(GRIDSIZE), intent(out) :: cld_one_type
 character(2), dimension(8), parameter :: typename =  &
                                     (/"Hc","As","Ac","St","Sc","Cu","Ns","Dc"/)
-integer :: i, k, n, maxn, typenum, k1, k2
+integer, dimension(8,GRIDSIZE) :: typecount
+integer :: i, k, n, maxn, typenum, k1, k2, m
 real :: base, top, clsize, rain, thick
 cltype = 0
+typecount = 0
 do i=1,NX
    maxn = maxval(label_data(i,:))
    do n=1,maxn
       typenum = 10
+      k1=0
+      k2=0
       do k=1,NZ
          if (label_data(i,k)==n) then
             base = height(k) - hsfc
@@ -254,6 +259,7 @@ do i=1,NX
             exit
          endif
       enddo
+      if(k1==0 .and. k2 ==0) cycle
       clsize = cld_inc_size(n)
       thick = 0.
       do k=k1,k2
@@ -296,37 +302,16 @@ do i=1,NX
          endif
       endif
 
-!      if (rain >= 1.e-6) then
-!         if (thick > 4000.) then
-!            if (clsize*1000./thick > 100. ) then
-!               typenum = 7
-!            else
-!               typenum = 8
-!            endif
-!         else
-!           if (base > 2000.) then
-!              typenum = 3
-!           else
-!              typenum = 5
-!           endif
-!         endif
-!      else
-!         if (base > 7000.) then
-!            typenum = 1
-!         elseif (base > 3000.) then
-!            typenum = 2
-!         else
-!           if (clsize*1000./thick >= 100. ) then
-!              typenum = 4
-!           else
-!              typenum = 6
-!           endif 
-!         endif
-!      endif
       do k=1,NZ
          if (label_data(i,k) == n) cltype(i,k) = typenum
       enddo
+      typecount(typenum,n) = typecount(typenum,n) + 1
    enddo
+enddo
+cld_one_type = "--"
+maxn = maxval(label_data)
+do n=1,maxn
+   cld_one_type(n) = typename( maxloc(typecount(:,n), dim=1) )
 enddo
 end subroutine
 
