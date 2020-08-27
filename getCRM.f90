@@ -2,15 +2,15 @@ program getCRM
 use netcdf
 implicit none
 character(20), parameter :: casename="CPL64"
-character(99), parameter :: path="/data/W.eddie/SPCAM/"//trim(casename)//"/"
-real(kind=4), parameter :: target_lon=120., target_lat=-10. ! target grid
+character(99), parameter :: path="/data/W.eddie/SPCAM/CPL64/"
+real(kind=4), parameter :: target_lon=0, target_lat=-60 ! target grid
 character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dayend=(/31,28,31,30,31,30,31,31,30,31,30,31/)
 integer :: i, xidx, yidx, year, month, day, crmt1, tsize, t
 integer :: ncid, lonid, latid, z3id, timevid, qtotid, qciid, crmxid, crmzid
 integer :: timeid, lat1id, lon1id, crmzvid, crmxvid, qprid
 real(kind=4) :: lon(144), lat(96), time(1488), hgt(24)
-logical :: first
+logical :: first, file_exist
 character(3) :: outlon, outlat
 character(4) :: yyyy
 character(2) :: mm, dd
@@ -43,10 +43,6 @@ call check_nf90( nf90_get_var(ncid, z3id, hgt, (/xidx, yidx, 3/), (/1, 1, 24/)) 
 hgt = hgt(24:1:-1)
 call check_nf90( nf90_close(ncid) )
 
-write(outlon,'(I3)') nint(lon(xidx))
-write(outlat,'(I3)') nint(lat(yidx))
-outlon=adjustl(outlon)
-outlat=adjustl(outlat)
 call execute_command_line("mkdir -p "//trim(outpath), wait=.True.)
 
 first = .True.
@@ -80,6 +76,10 @@ do year=1,10
                  exit
                endif
             enddo
+            write(outlon,'(I3)') nint(lon(xidx))
+            write(outlat,'(I3)') nint(lat(yidx))
+            outlon=adjustl(outlon)
+            outlat=adjustl(outlat)
 
             first = .False.
          endif
@@ -102,7 +102,11 @@ do year=1,10
       qpr(:,:,1:tsize) = qtot(:,:,1:tsize) - qci(:,:,1:tsize)
       outfile = &
         trim(outpath)//"Q_"//trim(outlon)//"-"//trim(outlat)//"_"//yyyy//"-"//mm//".nc"
-      call execute_command_line("rm -f "//outfile, wait=.True.)
+      INQUIRE(FILE=outfile, EXIST=file_exist)
+      if (file_exist) then
+         print*, trim(outfile), " exists. Delete it and create new one."
+         call execute_command_line("rm -f "//outfile, wait=.True.)
+      endif
       call check_nf90( nf90_create(outfile, NF90_NETCDF4, ncid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nx", 64, crmxid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nz", 24, crmzid) )
