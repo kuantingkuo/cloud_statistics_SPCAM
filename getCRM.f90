@@ -6,7 +6,7 @@ character(99), parameter :: path="/data/W.eddie/SPCAM/"//trim(casename)//"/"
 real(kind=4), parameter :: target_lon=120., target_lat=-10. ! target grid
 character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dayend=(/31,28,31,30,31,30,31,31,30,31,30,31/)
-integer :: i, xidx, yidx, year, month, day, crmt1, tsize
+integer :: i, xidx, yidx, year, month, day, crmt1, tsize, t
 integer :: ncid, lonid, latid, z3id, timevid, qtotid, qciid, crmxid, crmzid
 integer :: timeid, lat1id, lon1id, crmzvid, crmxvid, qprid
 real(kind=4) :: lon(144), lat(96), time(1488), hgt(24)
@@ -47,7 +47,7 @@ write(outlon,'(I3)') nint(lon(xidx))
 write(outlat,'(I3)') nint(lat(yidx))
 outlon=adjustl(outlon)
 outlat=adjustl(outlat)
-call execute_command_line("mkdir -p "//outpath)
+call execute_command_line("mkdir -p "//trim(outpath), wait=.True.)
 
 first = .True.
 do year=1,10
@@ -63,8 +63,6 @@ do year=1,10
          filename = &
             trim(path)//trim(casename)//".cam.h1."//yyyy//"-"//mm//"-"//dd//"-00000.nc"
          call check_nf90( nf90_open(filename, NF90_NOWRITE, ncid) )
-         call check_nf90( nf90_inq_varid(ncid, "time", timevid) )
-         call check_nf90( nf90_get_var(ncid, timevid, time(crmt1:day*48)) )
          if (first) then
             call check_nf90( nf90_inq_varid(ncid, "LAT_15s_to_30n", latid) )
             call check_nf90( nf90_get_var(ncid, latid, lat(1:24)) )
@@ -85,21 +83,26 @@ do year=1,10
 
             first = .False.
          endif
+         call check_nf90( nf90_inq_varid(ncid, "time", timevid) )
          call check_nf90( nf90_inq_varid(ncid, "CRM_QI_LON_60e_to_180e_LAT_15s_to_30n", &
                                          qtotid) )
-         call check_nf90( nf90_get_var(ncid, qtotid, qtot(:,:,crmt1:day*48), &
-                                       (/xidx, yidx, 1, 1, 1, 1/), (/1, 1, 64, 1, 24, 48/)) )
          call check_nf90( nf90_inq_varid(ncid, "CRM_QC_LON_60e_to_180e_LAT_15s_to_30n", &
                                          qciid) )
-         call check_nf90( nf90_get_var(ncid, qciid, qci(:,:,crmt1:day*48), &
-                                       (/xidx, yidx, 1, 1, 1, 1/), (/1, 1, 64, 1, 24, 48/)) )
+         do t=1,48
+            call check_nf90( nf90_get_var(ncid, timevid, time(crmt1+t-1), (/t/)) )
+            call check_nf90( nf90_get_var(ncid, qtotid, qtot(:,:,crmt1+t-1), &
+                                     (/xidx, yidx, 1, 1, 1, t/), (/1, 1, 64, 1, 24, 1/)) )
+            call check_nf90( nf90_get_var(ncid, qciid, qci(:,:,crmt1+t-1), &
+                                     (/xidx, yidx, 1, 1, 1, t/), (/1, 1, 64, 1, 24, 1/)) )
+         enddo
          call check_nf90( nf90_close(ncid) )
       enddo
       print*,"processing dataset..."
       tsize = dayend(month)*48
       qpr(:,:,1:tsize) = qtot(:,:,1:tsize) - qci(:,:,1:tsize)
-      outfile = outpath//"Q_"//trim(outlon)//"-"//trim(outlat)//"_"//yyyy//"-"//mm//".nc"
-      call execute_command_line("rm -f "//outfile)
+      outfile = &
+        trim(outpath)//"Q_"//trim(outlon)//"-"//trim(outlat)//"_"//yyyy//"-"//mm//".nc"
+      call execute_command_line("rm -f "//outfile, wait=.True.)
       call check_nf90( nf90_create(outfile, NF90_NETCDF4, ncid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nx", 64, crmxid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nz", 24, crmzid) )
@@ -141,7 +144,7 @@ do year=1,10
       call check_nf90( nf90_put_var(ncid, qciid, qci(:,:,1:tsize)) )
       call check_nf90( nf90_put_var(ncid, qprid, qpr(:,:,1:tsize)) )
       call check_nf90( nf90_close(ncid) )
-      call execute_command_line("./cal_cloud_spcam.exe "//outfile//" &")
+      call execute_command_line("./cal_cloud_spcam.exe "//outfile, wait=.False.)
    enddo
 enddo
 
