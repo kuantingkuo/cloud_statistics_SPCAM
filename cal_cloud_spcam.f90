@@ -319,7 +319,13 @@ enddo
 cld_one_type = "--"
 maxn = maxval(label_data)
 do n=1,maxn
-   cld_one_type(n) = typename( maxloc(typecount(:,n), dim=1) )
+   if (typecount(7,n) > 0) then
+      cld_one_type(n) = 7
+   elseif (typecount(8,n) > 0) then
+      cld_one_type(n) = 8
+   else
+      cld_one_type(n) = typename( maxloc(typecount(:,n), dim=1) )
+   endif
 enddo
 end subroutine
 
