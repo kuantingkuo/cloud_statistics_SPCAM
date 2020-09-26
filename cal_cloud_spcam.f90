@@ -243,7 +243,7 @@ character(2), dimension(8), parameter :: typename =  &
                                     (/"Hc","As","Ac","St","Sc","Cu","Ns","Dc"/)
 integer, dimension(8,GRIDSIZE) :: typecount
 integer :: i, k, n, maxn, typenum, k1, k2, m
-real :: base, top, clsize, rain, thick
+real :: base, top, clsize, rain, thick, rainsfc
 cltype = 0
 typecount = 0
 do i=1,NX
@@ -267,7 +267,8 @@ do i=1,NX
             exit
          endif
       enddo
-      if(k1==0 .and. k2 ==0) cycle
+      rainsfc = qr3d_data(i,1)
+      if(k1==0 .and. k2==0) cycle
       clsize = cld_inc_size(n)
       thick = 0.
       do k=k1,k2
@@ -277,12 +278,12 @@ do i=1,NX
       if (base > 7000.) then
          typenum = 1
       elseif (base > 4000.) then
-         if (rain > 1.e-6) then
+         if (rain > 1.e-5) then
             typenum = 3
          else
             typenum = 2
          endif
-      elseif ((thick > 5000.) .and. (rain > 1.e-5)) then
+      elseif ((rainsfc > 3.e-4) .and. thick > 2000.) then
          if (clsize*1000./thick > 100.) then
             typenum = 7
          else
@@ -291,20 +292,30 @@ do i=1,NX
       elseif (base <= 2000.) then
          if (clsize*1000./thick > 30.) then
             if (rain >= 1.e-5) then
-               typenum = 5
+               if (thick > 2000.) then
+                  typenum = 7
+               else
+                  typenum = 5
+               endif
             else
                typenum = 4
             endif
+         elseif (top >= 5000.) then
+            typenum = 8
          else
             typenum = 6
          endif
       else
-         if ((base > 3000.) .or. (clsize*1000./thick > 100.)) then
-            if (rain > 1.e-6) then
-               typenum = 3
-            else
+         if ((clsize*1000./thick > 100.)) then
+            if (rain < 1.e-6) then
                typenum = 2
+            elseif (thick > 3000.) then
+               typenum = 7
+            else
+               typenum = 3
             endif
+         elseif (thick > 3000.) then
+            typenum = 8
          else
             typenum = 6
          endif
@@ -320,9 +331,9 @@ cld_one_type = "--"
 maxn = maxval(label_data)
 do n=1,maxn
    if (typecount(7,n) > 0) then
-      cld_one_type(n) = 7
+      cld_one_type(n) = typename(7)
    elseif (typecount(8,n) > 0) then
-      cld_one_type(n) = 8
+      cld_one_type(n) = typename(8)
    else
       cld_one_type(n) = typename( maxloc(typecount(:,n), dim=1) )
    endif
