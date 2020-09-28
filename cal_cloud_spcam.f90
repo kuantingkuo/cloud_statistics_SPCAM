@@ -92,6 +92,7 @@ program cldsize
        call find_cloud( qc3d_data, dx, depth, label_data, cld_inc_size, label )
        cld_inc_size = cld_inc_size * 1.e-6 ! m^2 -> km^2
        qr3d_data = qralldata(:,:,time)
+!       print*,'Time:',time
        call cloud_type( label_data, qc3d_data, qr3d_data, height, depth, hsfc, cltype, cld_one_type )
 
        if ( WRITE_BACK ) then
@@ -247,13 +248,23 @@ character(2), dimension(8), parameter :: typename =  &
                                     (/"Hc","As","Ac","St","Sc","Cu","Ns","Dc"/)
 integer :: i, k, n, maxn, k1, k2, m, countn
 real :: cloudF, Ztemp
+logical, parameter :: debug = .false.
 
 maxn = maxval(label_data(:,:))
 thick = 0.
 cltype = 0
-Ze = 0.
-Max10dbH = 0.
+Ze = -9.99e10
+Max10dbH = -9.99e10
 cloudF = 0.
+base = 9.99e10
+top = -9.99e10
+Zeheight = -9.99e10
+rain = -9.99e10
+maxtop = -9.99e10
+minbase = 9.99e10
+maxdz = -9.99e10
+maxZe = -9.99e10
+
 do i=1,NX
     if (any(label_data(i,:) > 0)) then
         cloudF = cloudF + 1./real(NX)
@@ -271,7 +282,9 @@ do i=1,NX
                 exit
             endif
         enddo
-        if (all(label_data(i,1:k1-1)==0)) rain(i,n) = qr3d_data(i,1)
+        if (all(label_data(i,1:k1-1)==0) .and. all(qr3d_data(i,1:k1) > 1.e-6)) then
+            rain(i,n) = qr3d_data(i,1)
+        endif
         do k=NZ,k1,-1
             if (label_data(i,k)==n) then
                 top(i,n) = height(k) - hsfc
@@ -282,7 +295,7 @@ do i=1,NX
         if(k1==0 .and. k2==0) cycle
         do k=k1,k2
             thick(i,n) = thick(i,n) + depth(k)
-            Ztemp = (log10(qr3d_data(i,k)+0.01*qc3d_data(i,k)) + 5.) * 20.
+            Ztemp = (log10(qr3d_data(i,k)+0.02*qc3d_data(i,k)) + 5.) * 20.
             if (Ze(i,n) < Ztemp) then
                 Ze(i,n) = Ztemp
                 Zeheight(i,n) = height(k)
@@ -362,21 +375,25 @@ do n=1,maxn
             Max10dbH(n) > 3. .and. meandz(n) < 5.) then
             conv_flag(n) = .true.
         endif
-        if (meanbase(n) < 5.) then !? MeanbaseT > -6.
+        if (minbase(n) < 3.) then !? MeanbaseT > -6.
             if (meandz(n) < 2.6 .and. meanbase(n) < 2. .and. maxtop(n) < 4.5) then
                 if (maxtop(n) < 4.5 .and. meandz(n) < 2.5) then
                     typenum(n) = 4  ! St
+                    if(debug) print*,n,'prec->yes'
                 elseif (meantop(n) < 3.5 .and. max10dbH(n) < 3. .and. &
                         (intenseprec(n) < 1 .or. length(n) > 100) .and. &
                         veryintenseprec(n) < 1) then
                     typenum(n) = 5  ! Sc
+                    if(debug) print*,n,'prec->yes'
                 else
                     typenum(n) = 6  ! Cu
+                    if(debug) print*,n,'prec->yes->1'
                 endif
             elseif (meandz(n) <= 6. .and. length(n) < 75 .and. &
                     meanZe(n)+devZe(n) >= 6. .and. maxtop(n) <=7 .and. &
                     devtop(n) >= 0.3) then
                 typenum(n) = 6  ! Cu
+                    if(debug) print*,n,'prec->yes->2'
             elseif ((indprec(n) >= 13 .or. (maxdz(n) < 8. .and. length(n) > 60) .or. &
                     (maxdz(n) > 7. .and. max10dbH(n) < 3.5 .and. length(n) > 30) .or. &
                     (meandz(n) < 10.2 .and. length(n) > 45 .and. meanZe(n) < 10. .and. &
@@ -392,6 +409,7 @@ do n=1,maxn
                            meanbase(n) < 1.8)) &
                     .and. (.not. deep_flag(n))) then
                 typenum(n) = 7  ! Ns
+                    if(debug) print*,n,'prec->yes'
             elseif (((meantop(n)-meanheight(n) < 2.1 .and. meanZe(n) < 5. .and. &
                       devtop(n) < 0.3) .or. (meantop(n) > 4. .and. maxZe(n) < 10. .and. &
                       meanZe(n) < -1 .and. maxtop(n) < 7.) .or. (meantop(n) > 4. .and. &
@@ -401,23 +419,30 @@ do n=1,maxn
                       meandz(n) > 2.5 .and. meandz(n) < 4.5 .and. devtop(n) < 0.3)) &
                     .and. (.not. conv_flag(n))) then
                 typenum(n) = 3  ! Ac
+                    if(debug) print*,n,'prec->yes'
             elseif (meandz(n) < 5. .or. (meandz(n) < 6. .and. maxtop(n) < 6.5)) then
                 typenum(n) = 6  ! Cu
+                    if(debug) print*,n,'prec->yes->3',meandz(n)
             else
                 typenum(n) = 8  ! Dc
+                    if(debug) print*,n,'prec->yes'
             endif
         else
             if (maxtop(n) < 3.9 .and. meandz(n) < 2.5 .and. meanbase(n) < 1.5 &
                     .and. (length(n) > 50 .or. maxZe(n) < 10.)) then
                 typenum(n) = 5  ! Sc
+                    if(debug) print*,n,'prec->no'
             elseif (meandz(n) < 2.5 .and. meanbase(n) > 1.8) then
                 typenum(n) = 3  ! Ac
+                    if(debug) print*,n,'prec->no'
             elseif ((length(n) < 50  .and. meanZe(n)+devZe(n) > 7.) .or. &
                     (length(n) < 70 .and. meanZe(n)+devZe(n) > 12.) .or. &
                     (conv_flag(n) .and. meandz(n) < 3.)) then
                 typenum(n) = 6  ! Cu
+                    if(debug) print*,n,'prec->no'
             else
                 typenum(n) = 7  ! Ns
+                    if(debug) print*,n,'prec->no'
             endif
         endif  ! end prec. cloud
 
@@ -426,36 +451,48 @@ do n=1,maxn
         if ((meanZe(n) < 0.05 .and. meanheight(n) > 7.5 .and. minbase(n) > 5. .and. &
              meandz(n) < 6.1 .and. meanbase(n) > 5.5) .or. meanbase(n) > 10.) then
             typenum(n) = 1  ! Hc
+                    if(debug) print*,n,'high'
         elseif (meanbase(n) > 2.) then
             typenum(n) = 2  ! As
+                    if(debug) print*,n,'high',meanbase(n),meanheight(n),meanZe(n)
         elseif (meandz(n) < 6.) then
             typenum(n) = 6  ! Cu
+                    if(debug) print*,n,'high'
         else
             typenum(n) = 8  ! Dc
+                    if(debug) print*,n,'high'
         endif  ! end high cloud
 
     elseif (meanHeight(n)<2. .or. meanbase(n)<1.5) then  !low cloud
         if (cloudF < 0.25) then
             typenum(n) = 6  ! Cu
+                    if(debug) print*,n,'low->1'
         elseif (maxtop(n) < 3. .and. meanbase(n) < 1.8 .and. intenseprec(n) < 1) then
             typenum(n) = 4  ! St
+                    if(debug) print*,n,'low'
         elseif (devZe(n)/meanZe(n) > 0.3 .and. maxtop(n) > 3. .and. &
                 maxtop(n) < 9.5 .and. meanZe(n) < 2. .and. meandz(n) < 8. .and. &
                 (meanbase(n) > 1.8 .or. (meanbase(n) > 1. .and. maxtop(n) > 3.5) .or. &
                  (meanZe(n) < -5. .and. maxtop(n) > 3.5 .and. meandz(n) > 2.))) then
             typenum(n) = 3  ! Ac
+                    if(debug) print*,n,'low'
         elseif (meandz(n) > 8. .and. meanZe(n) < 0.) then
             typenum(n) = 2  ! As
+                    if(debug) print*,n,'low'
         elseif ((meandz(n) > 2. .or. intenseprec(n) < 1 .or. maxtop(n) >= 3.) .and. &
                 meandz(n) < 7. .and. meanZe(n) > 0. .and. length(n) < 100) then
             typenum(n) = 6  ! Cu
+                    if(debug) print*,n,'low'
         elseif ((meandz(n) > 2. .or. maxtop(n) >= 4.) .and. meandz(n) < 7. .and. &
                 meanZe(n) > -5 .and. length(n) > 56) then
             typenum(n) = 7  ! Ns
+                    if(debug) print*,n,'low'
         elseif (meandz(n) > 8.) then
             typenum(n) = 8  ! Dc
+                    if(debug) print*,n,'low'
         else
             typenum(n) = 5  ! Sc
+                    if(debug) print*,n,'low',meanbase(n),meanHeight(n)
         endif  ! end low cloud
 
     else  ! middle cloud
@@ -464,14 +501,18 @@ do n=1,maxn
                     (meanbase(n) < 1.85 .and. maxtop(n) < 4. .and. &
                      meandz(n) < 2. .and. meantop(n) < 3.2))) then
             typenum(n) = 5  ! Sc
+                    if(debug) print*,n,'middle'
         elseif (meanbase(n) < 2. .and. meandz(n) < 1. .and. &
                 maxtop(n)-minbase(n) < 1.5) then !? mintop ?
             typenum(n) = 4  ! St
+                    if(debug) print*,n,'middle'
         elseif (meanbase(n) < 1.2 .and. meandz(n) > 4.5 .and. length(n) > 52) then
             typenum(n) = 7  ! Ns
+                    if(debug) print*,n,'middle'
         elseif (meanbase(n) < 2. .and. (cloudF < 0.25 .or. &
                     (cloudF < 0.5 .and. meanheight(n) < 5.))) then
             typenum(n) = 6  ! Cu
+                    if(debug) print*,n,'middle'
         elseif (meanbase(n) < 8. .and. ((meanbase(n) > 1.8 .and. &
                  meanbase(n) < 3.5 .and. meandz(n) < 2.7 .and. meanZe(n) < 0.) &
                 .or. (meanbase(n) > 1.8 .and. meanbase(n) < 7. .and. &
@@ -497,8 +538,10 @@ do n=1,maxn
                        (minbase(n) < 1.2 .and. devbase(n) > 0.57) .or. &
                        (minbase(n) < 1.5 .and. devbase(n) > 0.9))))) then
             typenum(n) = 3  ! Ac
+                    if(debug) print*,n,'middle'
         else
             typenum(n) = 2  ! As
+                    if(debug) print*,n,'middle'
         endif  ! end middle cloud
     endif
     cld_one_type(n) = typename( typenum(n) )
