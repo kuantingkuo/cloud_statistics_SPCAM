@@ -10,7 +10,7 @@ program cldsize
     Logical             , parameter :: WRITE_BACK = .True.
     Integer             , parameter :: CONNECT    = 4 ![4|8] ways connetion
     Integer             , parameter :: C_DIM      = 2
-    Character ( len=99 )            :: FILE_NAME, SIZE_FILE
+    Character ( len=: ), allocatable :: FILE_NAME, SIZE_FILE
     Integer                         :: Time, x, label, i, j, temp, k, t, num
     Integer                         :: label_data(NX,NZ) , cloudflag(NX,NZ)
     Real(kind=4)                    :: cld_inc_size( GRIDSIZE )
@@ -22,9 +22,15 @@ program cldsize
     integer :: latid, lonid, status, length
     real(kind=4) :: lon, lat, hsfc
     character(2), dimension(GRIDSIZE) :: cld_one_type
+    logical, parameter :: debug = .false.
 
-    call get_command_argument(1, FILE_NAME, length)
-    SIZE_FILE = FILE_NAME(1:length-2)//"txt"
+    call get_command_argument(1, length=length)
+    allocate(character(length) :: FILE_NAME)
+    call get_command_argument(1, value=FILE_NAME)
+    print*,FILE_NAME,length
+    length = length + 1
+    allocate(character(length) :: SIZE_FILE)
+    SIZE_FILE = FILE_NAME(1:length-3)//"txt"
     print*, "output file to ", trim(SIZE_FILE)
     open( unit=4567 , file=SIZE_FILE, status="unknown" )
 
@@ -92,7 +98,7 @@ program cldsize
        call find_cloud( qc3d_data, dx, depth, label_data, cld_inc_size, label )
        cld_inc_size = cld_inc_size * 1.e-6 ! m^2 -> km^2
        qr3d_data = qralldata(:,:,time)
-!       print*,'Time:',time
+       if(debug) print*,'Time:',time
        call cloud_type( label_data, qc3d_data, qr3d_data, height, depth, hsfc, cltype, cld_one_type )
 
        if ( WRITE_BACK ) then
@@ -305,6 +311,8 @@ do i=1,NX
    enddo
 enddo
 
+where(Ze < -40.) Ze = -40.
+where(Ze > 50.) Ze = 50.
 maxtop = maxval(top, dim=1)/1000.
 minbase = minval(base, dim=1)/1000.
 maxdz = maxval(thick, dim=1)/1000.
@@ -439,7 +447,7 @@ do n=1,maxn
                     (length(n) < 70 .and. meanZe(n)+devZe(n) > 12.) .or. &
                     (conv_flag(n) .and. meandz(n) < 3.)) then
                 typenum(n) = 6  ! Cu
-                    if(debug) print*,n,'prec->no'
+                    if(debug) print*,n,'prec->no', meanZe(n),devZe(n)
             else
                 typenum(n) = 7  ! Ns
                     if(debug) print*,n,'prec->no'

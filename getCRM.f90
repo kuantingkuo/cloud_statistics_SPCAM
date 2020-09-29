@@ -3,7 +3,7 @@ use netcdf
 implicit none
 character(20), parameter :: casename="CPL64"
 character(99), parameter :: path="/data/W.eddie/SPCAM/CPL64/"
-real(kind=4), parameter :: target_lon=98, target_lat=-10 ! target grid
+real(kind=4), parameter :: target_lon=95, target_lat=-8.52632 ! target grid
 character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dayend=(/31,28,31,30,31,30,31,31,30,31,30,31/)
 integer :: i, xidx, yidx, year, month, day, crmt1, tsize, t
@@ -148,7 +148,8 @@ do year=1,10
       call check_nf90( nf90_put_var(ncid, qciid, qci(:,:,1:tsize)) )
       call check_nf90( nf90_put_var(ncid, qprid, qpr(:,:,1:tsize)) )
       call check_nf90( nf90_close(ncid) )
-      call execute_command_line("./cal_cloud_spcam.exe "//trim(outfile), wait=.False.)
+!      call execute_command_line("./cal_cloud_spcam.exe "//trim(outfile), wait=.False.)
+      call system("./cal_cloud_spcam.exe "//trim(outfile))
    enddo
 enddo
 
