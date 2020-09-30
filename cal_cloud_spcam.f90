@@ -27,7 +27,6 @@ program cldsize
     call get_command_argument(1, length=length)
     allocate(character(length) :: FILE_NAME)
     call get_command_argument(1, value=FILE_NAME)
-    print*,FILE_NAME,length
     length = length + 1
     allocate(character(length) :: SIZE_FILE)
     SIZE_FILE = FILE_NAME(1:length-3)//"txt"

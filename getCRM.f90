@@ -3,7 +3,7 @@ use netcdf
 implicit none
 character(20), parameter :: casename="CPL64"
 character(99), parameter :: path="/data/W.eddie/SPCAM/CPL64/"
-real(kind=4), parameter :: target_lon=95, target_lat=-8.52632 ! target grid
+real(kind=4), parameter :: target_lon=105, target_lat=0.947368 ! target grid
 character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dayend=(/31,28,31,30,31,30,31,31,30,31,30,31/)
 integer :: i, xidx, yidx, year, month, day, crmt1, tsize, t
@@ -80,9 +80,19 @@ do year=1,10
             write(outlat,'(I3)') nint(lat(yidx))
             outlon=adjustl(outlon)
             outlat=adjustl(outlat)
-
             first = .False.
          endif
+         outfile = &
+             trim(outpath)//"Q_"//trim(outlon)//"-"//trim(outlat)// &
+             "_"//yyyy//"-"//mm//".nc"
+         INQUIRE(FILE=outfile, EXIST=file_exist)
+         if (file_exist) then
+             print*, trim(outfile), " exists."
+!             call execute_command_line("rm -f "//outfile, wait=.True.)
+             call system("./cal_cloud_spcam.exe "//trim(outfile))
+             exit
+         endif
+
          call check_nf90( nf90_inq_varid(ncid, "time", timevid) )
          call check_nf90( nf90_inq_varid(ncid, "CRM_QI_LON_60e_to_180e_LAT_15s_to_30n", &
                                          qtotid) )
@@ -100,13 +110,6 @@ do year=1,10
       print*,"processing dataset..."
       tsize = dayend(month)*48
       qpr(:,:,1:tsize) = qtot(:,:,1:tsize) - qci(:,:,1:tsize)
-      outfile = &
-        trim(outpath)//"Q_"//trim(outlon)//"-"//trim(outlat)//"_"//yyyy//"-"//mm//".nc"
-      INQUIRE(FILE=outfile, EXIST=file_exist)
-      if (file_exist) then
-         print*, trim(outfile), " exists. Delete it and create new one."
-         call execute_command_line("rm -f "//outfile, wait=.True.)
-      endif
       call check_nf90( nf90_create(outfile, NF90_NETCDF4, ncid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nx", 64, crmxid) )
       call check_nf90( nf90_def_dim(ncid, "crm_nz", 24, crmzid) )
