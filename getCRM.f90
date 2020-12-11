@@ -1,9 +1,9 @@
 program getCRM
 use netcdf
 implicit none
-character(20), parameter :: casename="CPL64"
-character(99), parameter :: path="/data/W.eddie/SPCAM/CPL64/"
-real(kind=4), parameter :: target_lon=95, target_lat=-9 ! target grid
+character(20), parameter :: casename="PRSHR"
+character(99), parameter :: path="/data/W.eddie/SPCAM/PRSHR/"
+real(kind=4), parameter :: target_lon=105, target_lat=0.947368 ! target grid
 character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dayend=(/31,28,31,30,31,30,31,31,30,31,30,31/)
 integer :: i, xidx, yidx, year, month, day, crmt1, tsize, t
@@ -48,7 +48,7 @@ call execute_command_line("mkdir -p "//trim(outpath), wait=.True.)
 first = .True.
 do year=1,10
    write(yyyy,'(I0.4)') year
-   month: do month=1,12
+   monthloop: do month=1,12
       write(mm,'(I0.2)') month
       call timer(counttime)
       print*, yyyy,mm
@@ -90,7 +90,7 @@ do year=1,10
              print*, trim(outfile), " exists."
 !             call execute_command_line("rm -f "//outfile, wait=.True.)
              call system("./cal_cloud_spcam.exe "//trim(outfile))
-             exit month
+             exit monthloop
          endif
 
          call check_nf90( nf90_inq_varid(ncid, "time", timevid) )
@@ -153,7 +153,7 @@ do year=1,10
       call check_nf90( nf90_close(ncid) )
 !      call execute_command_line("./cal_cloud_spcam.exe "//trim(outfile), wait=.False.)
       call system("./cal_cloud_spcam.exe "//trim(outfile))
-   enddo month
+   enddo monthloop
 enddo
 
 contains
