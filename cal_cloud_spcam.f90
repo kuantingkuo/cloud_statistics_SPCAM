@@ -254,6 +254,8 @@ character(2), dimension(8), parameter :: typename =  &
 integer :: i, k, n, maxn, k1, k2, m, countn
 real :: cloudF, Ztemp
 logical, parameter :: debug = .false.
+real, dimension(NZ) :: cloudFlev
+logical, dimension(NZ) :: mask
 
 maxn = maxval(label_data(:,:))
 thick = 0.
@@ -261,6 +263,7 @@ cltype = 0
 Ze = -9.99e10
 Max10dbH = -9.99e10
 cloudF = 0.
+cloudFlev = 0.
 base = 9.99e10
 top = -9.99e10
 Zeheight = -9.99e10
@@ -272,7 +275,7 @@ maxZe = -9.99e10
 
 do i=1,NX
     if (any(label_data(i,:) > 0)) then
-        cloudF = cloudF + 1./real(NX)
+        where(label_data(i,:) > 0) cloudFlev(:) = cloudFlev(:) + 1./real(NX)
     else
         cycle
     endif
@@ -367,6 +370,11 @@ enddo
 
 cld_one_type = "--"
 do n=1,maxn
+    mask = .false.
+    do k=1,NZ
+        if(any(label_data(:,k)==n)) mask = .true.
+    enddo
+    cloudF = maxval(cloudFlev, mask)
     if (indprec(n) > 0 .and. meantop(n) > 2.5) then  ! prec. cloud
         deep_flag(n) = .false.
         conv_flag(n) = .false.
