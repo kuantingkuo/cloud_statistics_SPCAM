@@ -1,15 +1,16 @@
 program getCRM
 use netcdf
 implicit none
-character(20), parameter :: casename="PRSHR"
-character(99), parameter :: path="/data/W.eddie/SPCAM/PRSHR/"
-real(kind=4), parameter :: target_lon=105, target_lat=0.947368 ! target grid
+character(20), parameter :: casename="CPL64"
+character(99), parameter :: path="/data/W.eddie/SPCAM/CPL64/"
+real(kind=4), parameter :: target_lon=98, target_lat=-10 ! target grid
 character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dayend=(/31,28,31,30,31,30,31,31,30,31,30,31/)
 integer :: i, xidx, yidx, year, month, day, crmt1, tsize, t
 integer :: ncid, lonid, latid, z3id, timevid, qtotid, qciid, crmxid, crmzid
 integer :: timeid, lat1id, lon1id, crmzvid, crmxvid, qprid
-real(kind=4) :: lon(144), lat(96), time(1488), hgt(24)
+real(kind=4) :: lon(144), lat(96), hgt(24)
+real(kind=8) :: time(1488)
 logical :: first, file_exist
 character(3) :: outlon, outlat
 character(4) :: yyyy
@@ -53,7 +54,7 @@ do year=1,10
       call timer(counttime)
       print*, yyyy,mm
       print*,"open data..."
-      do day=1,dayend(month)
+      dayloop: do day=1,dayend(month)
          write(dd,'(I0.2)') day
          crmt1 = (day-1)*48 + 1
          filename = &
@@ -90,7 +91,7 @@ do year=1,10
              print*, trim(outfile), " exists."
 !             call execute_command_line("rm -f "//outfile, wait=.True.)
              call system("./cal_cloud_spcam.exe "//trim(outfile))
-             exit monthloop
+             exit dayloop !monthloop
          endif
 
          call check_nf90( nf90_inq_varid(ncid, "time", timevid) )
@@ -106,7 +107,7 @@ do year=1,10
                                      (/xidx, yidx, 1, 1, 1, t/), (/1, 1, 64, 1, 24, 1/)) )
          enddo
          call check_nf90( nf90_close(ncid) )
-      enddo
+      enddo dayloop
       print*,"processing dataset..."
       tsize = dayend(month)*48
       qpr(:,:,1:tsize) = qtot(:,:,1:tsize) - qci(:,:,1:tsize)
