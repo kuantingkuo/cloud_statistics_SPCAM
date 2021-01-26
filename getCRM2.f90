@@ -3,7 +3,7 @@ use netcdf
 implicit none
 character(20), parameter :: casename="tc20170601"
 character(99), parameter :: path="/data/W.eddie/SPCAM/tc20170601/atm/hist/"
-real(kind=4), parameter :: target_lon=95, target_lat=-8.52632 ! target grid
+real(kind=4), parameter :: target_lon=92.5, target_lat=-6.63158 ! target grid
 integer, parameter :: nlat=192, nlon=288, nlev=30, nx=64, nz=28, nt=720
 character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dom=(/31,28,31,30,31,30,31,31,30,31,30,31/)
