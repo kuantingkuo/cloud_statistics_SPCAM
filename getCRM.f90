@@ -91,7 +91,7 @@ do year=1,10
              print*, trim(outfile), " exists."
 !             call execute_command_line("rm -f "//outfile, wait=.True.)
              call system("./cal_cloud_spcam.exe "//trim(outfile))
-             exit dayloop !monthloop
+             exit monthloop
          endif
 
          call check_nf90( nf90_inq_varid(ncid, "time", timevid) )
