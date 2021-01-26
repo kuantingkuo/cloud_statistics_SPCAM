@@ -2,8 +2,8 @@ program getCRM
 use netcdf
 implicit none
 character(20), parameter :: casename="tc20170601"
-character(99), parameter :: path="/data/W.eddie/SPCAM/"//trim(casename)//"/atm/hist/"
-real(kind=4), parameter :: target_lon=95, target_lat=-9 ! target grid
+character(99), parameter :: path="/data/W.eddie/SPCAM/tc20170601/atm/hist/"
+real(kind=4), parameter :: target_lon=95, target_lat=-8.52632 ! target grid
 integer, parameter :: nlat=192, nlon=288, nlev=30, nx=64, nz=28, nt=720
 character(99), parameter :: outpath="./"//trim(casename)//"/"
 integer, dimension(12), parameter :: dom=(/31,28,31,30,31,30,31,31,30,31,30,31/)
@@ -105,8 +105,8 @@ do d=1,15
    if (file_exist) then
        print*, trim(outfile), " exists."
 !       call execute_command_line("rm -f "//outfile, wait=.True.)
-       call system("./cal_cloud_spcam.exe "//trim(outfile))
-       exit
+       call system("./cal_cloud_spcam2.exe "//trim(outfile))
+       stop
    endif
 
    call check_nf90( nf90_inq_varid(ncid, "time", timevid) )
@@ -176,7 +176,7 @@ call check_nf90( nf90_put_var(ncid, qciid, qci) )
 call check_nf90( nf90_put_var(ncid, qprid, qpr) )
 call check_nf90( nf90_close(ncid) )
 !call execute_command_line("./cal_cloud_spcam.exe "//trim(outfile), wait=.False.)
-call system("./cal_cloud_spcam.exe "//trim(outfile))
+call system("./cal_cloud_spcam2.exe "//trim(outfile))
 
 contains
 
